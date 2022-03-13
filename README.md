@@ -5,3 +5,6 @@ Głosowanie -
 Zabezpieczenie transakcji - 
 
 Przypadki użycia:
+
+
+Hej

@@ -14,4 +14,6 @@ System zostanie oparty o framework [ROS](http://wiki.ros.org/), który pozwala n
 
 ## Przypadki użycia:
 
-Zdecentralizowane sieci wymiany danych/zakupów internetowych.
+* Zdecentralizowane sieci wymiany danych.
+* Zdecentralizowane systemy transakcji (kryptowaluty).
+* Nadzór przelewów bankowych.

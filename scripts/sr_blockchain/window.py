@@ -28,6 +28,7 @@ class Window(QMainWindow):
         self.spinboxes: Dict[str, widgets.SpinBoxAbstract] = {}
         self.actions: Dict[str, QAction] = {}
         self.pixmaps: Dict[str, widgets.Pixmap] = {}
+        self.textBrowsers: Dict[str, widgets.TextBrowser] = {}
 
     def say(self, msg=None):
         print(self._name + " | MSG = " + msg)
@@ -120,6 +121,10 @@ class Window(QMainWindow):
     def addPixMap(self, name, path):
         self.pixmaps[name] = widgets.Pixmap(self, name, path)
         return self.pixmaps[name]
+
+    def addTextBrowser(self, name):
+        self.textBrowsers[name] = widgets.TextBrowser(self,name)
+
     @property
     def isOpened(self) -> bool:
         """

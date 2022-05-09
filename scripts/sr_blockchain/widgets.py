@@ -181,6 +181,14 @@ class LCD(Widget):
         return self._value
         pass
 
+    class TextBrowser(Widget):
+        _widget:QTextBrowser
+
+        def __init__(self, win: window.Window, name: str):
+            super().__init__(win, name)
+
+        def setText(self, text:str):
+            self._widget.setText(text)
 
 
 

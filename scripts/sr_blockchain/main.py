@@ -2,4 +2,6 @@
 
 from sr_blockchain.chainNode import ChainNode
 
-node = ChainNode().startNode().startLoop()
+node = ChainNode()
+node.startNode()
+node.startLoop()

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import List
 
 import cryptography
 from cryptography.hazmat.backends import default_backend
@@ -9,13 +10,14 @@ from cryptography.hazmat.primitives import serialization
 
 import rospy
 import rosnode
+
 import os
 import random
 import signal
+import json
 
 from  sr_blockchain.gui import GUI
 from sr_blockchain.srv import *
-
 
 
 class ChainNode(GUI):
@@ -26,7 +28,7 @@ class ChainNode(GUI):
 
     def initWidgets(self):
         self.mainWIndow.addButton("pushButton",self.getTransactions)
-        self.mainWIndow.addButton("pushButton_register",self.createUser)
+        self.mainWIndow.addButton("pushButton_register",self.register)
         self.mainWIndow.addButton("pushButton_startROS",self.startROS)
         self.spinBox_id = self.mainWIndow.addSpinBox("spinBox_ROS")
         self.spinBox_id_transactions = self.mainWIndow.addSpinBox("spinBox")
@@ -56,22 +58,54 @@ class ChainNode(GUI):
         pass
 
     def returnTransactions(self,foo):
-        #print(foo)
-        return "test" + self.id
+        """
+        Got no idea where the additional argument is coming from, discard it who cares!
+        """
+        
+        with open(self.transactionsPath, "r") as file:
+            data = file.read()
+            return data
+            pass
+
+        return "NO DATA"
         pass
 
     def getTransactions(self):
-        id = str(self.spinBox_id_transactions.value)
-        rospy.wait_for_service('getTransactionHistory_'+id)
-        try:
-            getHistory = rospy.ServiceProxy('getTransactionHistory_'+id, getTransactionHistory)
-            response = getHistory()
-            print(response)
-        except rospy.ServiceException as e:
-            print("Service call failed: %s"%e)
-        pass
+        ros_nodes: List[str] = rosnode.get_node_names()
+        chanNode_ids = []   
+
+        for node in ros_nodes:
+            if node.find("chainNode") != -1 and node.find("_") != -1:
+                node_id = node[node.find("_")+1:]
+                if node_id != self.id:
+                    chanNode_ids.append(node_id)
+
+        if chanNode_ids:
+            id = random.choice(chanNode_ids)
+
+            rospy.wait_for_service('getTransactionHistory_'+id)
+            try:
+                getHistory = rospy.ServiceProxy('getTransactionHistory_'+id, getTransactionHistory)
+                response = getHistory()
+                
+                with open(self.transactionsPath,"w") as file:
+                    try:
+                        file.write(response.transactionHistory)
+                        print("Received transaction history")
+                        print(response.transactionHistory)
+                    except Exception() as e:
+                        print(e)
+
+            except rospy.ServiceException as e:
+                print("Service call failed: %s"%e)
+            pass
+        else:
+            print("No nodes to ask for transaction history")
+            pass
     
-    def createUser(self):
+    def register(self):
+        self.startROS()
+
         self.userPath = os.path.join(os.path.realpath(__file__),"..\\"*3)
         self.userPath = os.path.join(self.userPath,"users","user_" + self.id)
         self.userPath = os.path.abspath(self.userPath)
@@ -79,6 +113,8 @@ class ChainNode(GUI):
         self.keyPath = os.path.join(self.userPath,"keys")
         self.publicKeyPath = os.path.join(self.keyPath,"public.txt")
         self.privateKeyPath = os.path.join(self.keyPath,"private.txt")
+
+        self.transactionsPath = os.path.join(self.userPath,"transactions.txt")
 
         if not os.path.exists(self.userPath):
             os.mkdir(self.userPath)
@@ -93,6 +129,10 @@ class ChainNode(GUI):
             self.loadKeySet()
         pass
 
+        if not os.path.exists(self.transactionsPath):
+            self.getTransactions()
+            pass
+
     def loadKeySet(self):
         with open(self.privateKeyPath, "rb") as key_file:
             self.private_key = serialization.load_pem_private_key(
@@ -100,6 +140,7 @@ class ChainNode(GUI):
                                             password=None,
                                         )
             self.public_key = self.private_key.public_key
+            pass
         print("Loaded key set")
         pass
 
@@ -117,7 +158,7 @@ class ChainNode(GUI):
 
         with open(self.privateKeyPath, "wb") as file:
             file.write(pem)
-        pass
+            pass
         
         self.public_key = self.privateKey.public_key()
         pem = self.public_key.public_bytes(
@@ -127,7 +168,7 @@ class ChainNode(GUI):
 
         with open(self.publicKeyPath, "wb") as file:
             file.write(pem)
-        pass
+            pass
 
         print("Generated key set")
         pass

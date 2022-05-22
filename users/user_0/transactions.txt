@@ -1,1 +1,0 @@
-{"recipient":"user_0", "value":10, "time":0, "hash":"0"}

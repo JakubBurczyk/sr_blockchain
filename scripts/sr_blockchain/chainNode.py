@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import List
+from cgitb import enable
+from typing import Dict, List
 
 import cryptography
 from cryptography.hazmat.backends import default_backend
@@ -10,39 +11,60 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 
 import rospy
+from rospy import ROSException
+from rospy import ServiceException
 import rosnode
 
 import os
 import random
 import signal
 import json
+import datetime
 
-from  sr_blockchain.gui import GUI
-from sr_blockchain.srv import *
+
+from sr_blockchain.gui import GUI
+from sr_blockchain.srv import getTransactionHistory, initializeTransaction, signTransaction
+
+
+class Transaction():
+    def __init__(self,sender: str, recipient: str, value:float, token: str) -> None:
+        self.sender = sender
+        self.recipient = recipient
+        self.token = token
+        self.ready = False
+        self.cancelled = False
+        self.valid = False
+        self.hash = " "
+        self.time_request = datetime.datetime.now().timestamp()
+        self.time_validated = -1
+        pass
 
 
 class ChainNode(GUI):
     private_key: RSAPrivateKey
     public_key: RSAPublicKey
-    
+    transaction_dict: Dict[str,Transaction] = dict()
+
     def __init__(self):
         super().__init__()
         self.mainWIndow = self.addWindow("mainWindow","chainNodeUI.ui")
         pass
 
     def __del__(self):
-        print("Killing chainNode")
+        self.printConsole("Killing chainNode")
         rospy.signal_shutdown("Destroying chainNode rospy kill")
 
     def initWidgets(self):
         self.mainWIndow.addButton("pushButton",self.getTransactions)
-        self.mainWIndow.addButton("pushButton_register",self.register)
+        self.button_register = self.mainWIndow.addButton("pushButton_register",self.register)
         self.mainWIndow.addButton("pushButton_initTransaction", self.startTransaction)
 
         self.spinBox_id = self.mainWIndow.addSpinBox("spinBox_ROS")
         self.spinBox_id_transactions = self.mainWIndow.addSpinBox("spinBox")
 
         self.lcd_self_id = self.mainWIndow.addLCD("lcdNumber")
+
+        self.terminal_out = self.mainWIndow.addTextBrowser("textBrowser")
         pass
 
     def startNode(self):
@@ -55,13 +77,20 @@ class ChainNode(GUI):
         pass
 
     def startROS(self):
-        self.id = str(self.spinBox_id.value)
-        self.rospyNode = rospy.init_node("chainNode_" + self.id)
-        self.transactionHistoryServer = rospy.Service('getTransactionHistory_' + self.id, getTransactionHistory, self.returnTransactions)
-        self.transactionInitServer = rospy.Service('initializeTransaction_' + self.id, initializeTransaction, self.processTransaction)
-        self.transactionSignServer = rospy.Service('signTransaction_' + self.id, signTransaction, self.processSignature)
         
+        self.id = str(self.spinBox_id.value)
         self.lcd_self_id.display(self.id)
+        try:
+            self.rospyNode = rospy.init_node("chainNode_" + self.id)
+            self.transactionHistoryServer = rospy.Service('getTransactionHistory_' + self.id, getTransactionHistory, self.returnTransactions)
+            self.transactionInitServer = rospy.Service('initializeTransaction_' + self.id, initializeTransaction, self.processTransaction)
+            self.transactionSignServer = rospy.Service('signTransaction_' + self.id, signTransaction, self.processSignature)
+            self.button_register.disable()
+        except (ServiceException,ROSException) as e:
+            self.printConsole(e)
+            self.lcd_self_id.display(-1)
+            self.button_register(enable)
+            pass
         pass
 
     def startLoop(self):
@@ -95,7 +124,7 @@ class ChainNode(GUI):
 
         if chainNode_ids:
             id = random.choice(chainNode_ids)
-            print("Nodes", chainNode_ids)
+            self.printConsole(["Nodes", chainNode_ids])
             rospy.wait_for_service('getTransactionHistory_' + id,timeout = 1)
             try:
                 getHistory = rospy.ServiceProxy('getTransactionHistory_'+id, getTransactionHistory)
@@ -104,19 +133,20 @@ class ChainNode(GUI):
                 with open(self.transactionsPath,"w") as file:
                     try:
                         file.write(response.transactionHistory)
-                        print("Received transaction history")
-                        print(response.transactionHistory)
+                        self.printConsole("Received transaction history")
+                        self.printConsole(response.transactionHistory)
                     except Exception() as e:
-                        print(e)
+                        self.printConsole(e)
 
             except rospy.ServiceException as e:
-                print("Get transaction history service call failed: %s"%e)
+                self.printConsole("Get transaction history service call failed: %s"%e)
             pass
         else:
-            print("No nodes to ask for transaction history")
+            self.printConsole("No nodes to ask for transaction history")
             pass
     
     def register(self):
+
         self.startROS()
 
         self.userPath = os.path.join(os.path.realpath(__file__),"..\\"*3)
@@ -146,6 +176,8 @@ class ChainNode(GUI):
             self.getTransactions()
             pass
 
+
+
     def loadKeySet(self):
         with open(self.privateKeyPath, "rb") as key_file:
             self.private_key = serialization.load_pem_private_key(
@@ -154,34 +186,34 @@ class ChainNode(GUI):
                                         )
             self.public_key = self.private_key.public_key()
             pass
-        print("Loaded key set")
+        self.printConsole("Loaded key set")
         pass
 
     def createKeySet(self):
-        print("Creating key set")
+        self.printConsole("Creating key set")
         self.private_key = rsa.generate_private_key(
                             public_exponent=65537,
                             key_size=512,
                             backend=default_backend()
                         )
-        print("Serializing private key")
+        self.printConsole("Serializing private key")
         pem = self.serializePrivateKey()
 
-        print("Saving key set")
+        self.printConsole("Saving key set")
         with open(self.privateKeyPath, "wb") as file:
             file.write(pem)
             pass
         
-        print("Serializing public key")
+        self.printConsole("Serializing public key")
         self.public_key = self.private_key.public_key()
         pem = self.serializePublicKey()
 
-        print("Saving public key")
+        self.printConsole("Saving public key")
         with open(self.publicKeyPath, "wb") as file:
             file.write(pem)
             pass
 
-        print("Generated key set")
+        self.printConsole("Generated key set")
         pass
 
     def serializePrivateKey(self) -> str:
@@ -202,12 +234,24 @@ class ChainNode(GUI):
         pass
 
     def processTransaction(self,initializeTransaction):
-        print(initializeTransaction.sender, initializeTransaction.recepient, initializeTransaction.value)
-        return "token_" + self.id
+        self.printConsole([initializeTransaction.sender, initializeTransaction.recipient, initializeTransaction.value])
+        token = "token_" + self.id + str(random.randint(0,10000000))
+        self.printConsole(token)
+
+        transaction = Transaction(
+                        sender = initializeTransaction.sender,
+                        recipient = initializeTransaction.recipient,
+                        value = initializeTransaction.value,
+                        token = token
+                        )
+
+        self.transaction_dict[token] = transaction
+
+        return token
         pass
 
     def processSignature(self,signTransaction): 
-        token = bytes(signTransaction.token,"UTF-8")
+        token = signTransaction.token
         signedToken = bytes(bytearray(signTransaction.signedToken))
         public_key = bytes(bytearray(signTransaction.public_key))
         
@@ -216,7 +260,7 @@ class ChainNode(GUI):
         try:
             senderNode_public_key.verify(
                                 signedToken,
-                                token,
+                                bytes(token,"UTF-8"),
                                 padding.PSS(
                                     mgf=padding.MGF1(hashes.SHA256()),
                                     salt_length=padding.PSS.MAX_LENGTH
@@ -224,13 +268,20 @@ class ChainNode(GUI):
                                 hashes.SHA256()
                                 )
 
-            #self.validateTransaction(self)
+            self.validateSingleTransaction_by_token(token)
 
         except Exception() as e:
-            print(e)
+            self.printConsole(e)
             pass
 
         return "processSignature response " + self.id
+        pass
+
+    def validateSingleTransaction_by_token(self,token: str):
+        
+        self.printConsole(f"Transaction w/ token: {token} is to be validated")
+        transaction = self.transaction_dict[token]
+        
         pass
 
     def startTransaction(self):
@@ -256,9 +307,20 @@ class ChainNode(GUI):
             serialized_public_key = self.serializePublicKey()
 
             response = sgnTransaction(token,signedToken, serialized_public_key)
-            print(response)
+            self.printConsole(response)
 
         except rospy.ServiceException as e:
-            print("Init transaction service call failed: %s"%e)
+            self.printConsole(f"Init transaction service call failed: {e}")
         pass
 
+    def printConsole(self,text):
+        if isinstance(text, str):
+            self.printConsoleLine(text)
+        else:
+            self.printConsoleLine(repr(text))
+        pass
+
+    def printConsoleLine(self,line:str):
+        line = f"[{datetime.datetime.now()}] {line}"
+        print(line)
+        self.terminal_out.appendLine(line)

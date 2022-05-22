@@ -8,7 +8,7 @@ from PyQt5 import QtWidgets, uic, QtGui
 import sys
 from termcolor import colored
 import numpy as np
-from typing import Callable
+from typing import Callable, List
 
 import os
 from abc import ABC
@@ -181,14 +181,30 @@ class LCD(Widget):
         return self._value
         pass
 
-    class TextBrowser(Widget):
-        _widget:QTextBrowser
+class TextBrowser(Widget):
+    _widget:QTextBrowser
 
-        def __init__(self, win: window.Window, name: str):
-            super().__init__(win, name)
+    def __init__(self, win: window.Window, name: str):
+        super().__init__(win, name)
+        pass
 
-        def setText(self, text:str):
-            self._widget.setText(text)
+    def setText(self, text:str):
+        self._widget.setText(text)
+        pass
+
+    def appendLine(self, line):
+        if isinstance(line, str):
+            self._widget.append(line)
+        elif isinstance(line, List):
+            for l in line:
+                self._widget.append(l)
+
+        self._widget.verticalScrollBar().setValue(self._widget.verticalScrollBar().maximum())
+        pass
+
+    def clear(self):
+        self._widget.clear()
+        pass
 
 
 

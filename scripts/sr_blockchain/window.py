@@ -124,6 +124,7 @@ class Window(QMainWindow):
 
     def addTextBrowser(self, name):
         self.textBrowsers[name] = widgets.TextBrowser(self,name)
+        return self.textBrowsers[name]
 
     @property
     def isOpened(self) -> bool:

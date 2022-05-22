@@ -1,5 +1,5 @@
 string sender
-string recepient
+string recipient
 float64 value
 ---
 string token

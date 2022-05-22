@@ -86,10 +86,12 @@ class ChainNode(GUI):
             self.transactionInitServer = rospy.Service('initializeTransaction_' + self.id, initializeTransaction, self.processTransaction)
             self.transactionSignServer = rospy.Service('signTransaction_' + self.id, signTransaction, self.processSignature)
             self.button_register.disable()
+            self.spinBox_id.disable()
         except (ServiceException,ROSException) as e:
             self.printConsole(e)
             self.lcd_self_id.display(-1)
             self.button_register(enable)
+            self.spinBox_id(enable)
             pass
         pass
 
@@ -285,33 +287,45 @@ class ChainNode(GUI):
         pass
 
     def startTransaction(self):
-        id = str(self.spinBox_id_transactions.value)
-        rospy.wait_for_service('initializeTransaction_' + id,1)
-        rospy.wait_for_service('signTransaction_' + id,1)
-        try:
-            initTransaction = rospy.ServiceProxy('initializeTransaction_' + id, initializeTransaction)
-            response = initTransaction(self.id,id,1.23)
-            token: str = response.token
-            #token = token[token.find("_")+1:]
-            
-            signedToken = self.private_key.sign(
-                            token.encode(),
-                            padding.PSS(
-                                mgf=padding.MGF1(hashes.SHA256()),
-                                salt_length=padding.PSS.MAX_LENGTH
-                            ),
-                            hashes.SHA256()
-                        )
-            
-            sgnTransaction = rospy.ServiceProxy('signTransaction_' + id, signTransaction)
-            serialized_public_key = self.serializePublicKey()
+        ros_nodes: List[str] = rosnode.get_node_names()
+        chainNode_ids = []   
 
-            response = sgnTransaction(token,signedToken, serialized_public_key)
-            self.printConsole(response)
+        for node in ros_nodes:
+            if node.find("chainNode") != -1 and node.find("_") != -1:
+                node_id = node[node.find("_")+1:]
+                if node_id != self.id:
+                    chainNode_ids.append(node_id)
 
-        except rospy.ServiceException as e:
-            self.printConsole(f"Init transaction service call failed: {e}")
-        pass
+        if not chainNode_ids:
+            self.printConsole(f"No nodes to process transaction")
+        else:
+            id = random.choice(chainNode_ids)
+            rospy.wait_for_service('initializeTransaction_' + id,1)
+            rospy.wait_for_service('signTransaction_' + id,1)
+            try:
+                initTransaction = rospy.ServiceProxy('initializeTransaction_' + id, initializeTransaction)
+                response = initTransaction(self.id,id,1.23)
+                token: str = response.token
+                #token = token[token.find("_")+1:]
+                
+                signedToken = self.private_key.sign(
+                                token.encode(),
+                                padding.PSS(
+                                    mgf=padding.MGF1(hashes.SHA256()),
+                                    salt_length=padding.PSS.MAX_LENGTH
+                                ),
+                                hashes.SHA256()
+                            )
+                
+                sgnTransaction = rospy.ServiceProxy('signTransaction_' + id, signTransaction)
+                serialized_public_key = self.serializePublicKey()
+
+                response = sgnTransaction(token,signedToken, serialized_public_key)
+                self.printConsole(response)
+
+            except rospy.ServiceException as e:
+                self.printConsole(f"Init transaction service call failed: {e}")
+            pass
 
     def printConsole(self,text):
         if isinstance(text, str):

@@ -60,7 +60,7 @@ class Transaction():
 
     def fromJson(self,line):
         
-        data = json.load(line)
+        data = json.loads(line)
         self.sender = data[TransactionConstants.JSON_FIELD_SENDER.value]
         self.recipient = data[TransactionConstants.JSON_FIELD_RECIPIENT.value]
         self.token = data[TransactionConstants.JSON_FIELD_TOKEN.value]
@@ -105,16 +105,18 @@ class ChainNode(GUI):
         rospy.signal_shutdown("Destroying chainNode rospy kill")
 
     def initWidgets(self):
+        self.terminal_out = self.mainWIndow.addTextBrowser("textBrowser")
+
         self.mainWIndow.addButton("pushButton",self.getTransactions)
         self.button_register = self.mainWIndow.addButton("pushButton_register",self.register)
         self.mainWIndow.addButton("pushButton_initTransaction", self.startTransaction)
+        self.mainWIndow.addButton("pushButton_calcMyBalance",lambda: self.calculateBalance(f"user_{self.id}"))
 
         self.spinBox_id = self.mainWIndow.addSpinBox("spinBox_ROS")
         self.spinBox_id_transactions = self.mainWIndow.addSpinBox("spinBox")
 
         self.lcd_self_id = self.mainWIndow.addLCD("lcdNumber")
 
-        self.terminal_out = self.mainWIndow.addTextBrowser("textBrowser")
         pass
 
     def startNode(self):
@@ -341,6 +343,8 @@ class ChainNode(GUI):
                     balance -= transaction.value
                 elif transaction.recipient == user:
                     balance += transaction.value
+
+        self.printConsole(f"Balance: {balance}")
         pass
 
     def startTransaction(self):

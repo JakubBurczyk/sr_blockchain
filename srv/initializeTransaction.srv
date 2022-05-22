@@ -1,0 +1,5 @@
+string sender
+string recepient
+float64 value
+---
+string token

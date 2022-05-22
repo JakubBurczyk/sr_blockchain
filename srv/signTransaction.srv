@@ -1,0 +1,5 @@
+string token
+uint8[] signedToken
+uint8[] public_key
+---
+string response

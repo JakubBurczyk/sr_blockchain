@@ -59,6 +59,8 @@ catkin_python_setup()
  add_service_files(
    FILES
    getTransactionHistory.srv
+   initializeTransaction.srv
+   signTransaction.srv
  )
 
 ## Generate actions in the 'action' folder

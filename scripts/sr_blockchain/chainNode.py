@@ -21,24 +21,74 @@ import signal
 import json
 import datetime
 
+from sr_blockchain.transactionConstants import TransactionConstants
+from sr_blockchain.chainNodeConstants import ChainNodeConstants
 
 from sr_blockchain.gui import GUI
 from sr_blockchain.srv import getTransactionHistory, initializeTransaction, signTransaction
 
 
 class Transaction():
-    def __init__(self,sender: str, recipient: str, value:float, token: str) -> None:
+    sender: str
+    recipient: str
+    token: str
+    hash: str
+
+    time_request: float
+    time_validated: float
+    value: float
+
+    ready: bool
+    cancelled: bool
+    valid: bool
+
+    def __init__(self,sender: str = None, recipient: str = None, value:float = None, token: str = None):
         self.sender = sender
         self.recipient = recipient
         self.token = token
+        self.hash = ""
+        self.time_request = datetime.datetime.now().timestamp()
+        self.time_validated = -1
+        self.value = value
+
         self.ready = False
         self.cancelled = False
         self.valid = False
-        self.hash = " "
-        self.time_request = datetime.datetime.now().timestamp()
-        self.time_validated = -1
+
+        self.dict_repr = {}
         pass
 
+    def fromJson(self,line):
+        
+        data = json.load(line)
+        self.sender = data[TransactionConstants.JSON_FIELD_SENDER.value]
+        self.recipient = data[TransactionConstants.JSON_FIELD_RECIPIENT.value]
+        self.token = data[TransactionConstants.JSON_FIELD_TOKEN.value]
+        self.hash = data[TransactionConstants.JSON_FIELD_HASH.value]
+        self.value = data[TransactionConstants.JSON_FIELD_VALUE.value]
+        self.time_request = data[TransactionConstants.JSON_FIELD_TIME_REQUEST.value]
+        self.time_validated = data[TransactionConstants.JSON_FIELD_TIME_VALIDATED.value]
+
+        return self
+        pass
+
+    def asDict(self):
+        self.dict_repr[TransactionConstants.JSON_FIELD_SENDER.value] = self.sender
+        self.dict_repr[TransactionConstants.JSON_FIELD_RECIPIENT.value] = self.recipient
+        self.dict_repr[TransactionConstants.JSON_FIELD_TOKEN.value] = self.token
+        self.dict_repr[TransactionConstants.JSON_FIELD_HASH.value] = self.hash
+        self.dict_repr[TransactionConstants.JSON_FIELD_VALUE.value] = self.value
+        self.dict_repr[TransactionConstants.JSON_FIELD_TIME_REQUEST.value] = self.time_request
+        self.dict_repr[TransactionConstants.JSON_FIELD_TIME_VALIDATED.value] = self.time_validated
+        return self.dict_repr
+        pass
+
+
+    def toJson(self):
+        return json.dumps(self.asDict())
+        pass
+
+    
 
 class ChainNode(GUI):
     private_key: RSAPrivateKey
@@ -148,18 +198,17 @@ class ChainNode(GUI):
             pass
     
     def register(self):
-
         self.startROS()
 
         self.userPath = os.path.join(os.path.realpath(__file__),"..\\"*3)
-        self.userPath = os.path.join(self.userPath,"users","user_" + self.id)
+        self.userPath = os.path.join(self.userPath,ChainNodeConstants.DIR_NAME_USERS.value,"user_" + self.id)
         self.userPath = os.path.abspath(self.userPath)
 
-        self.keyPath = os.path.join(self.userPath,"keys")
-        self.publicKeyPath = os.path.join(self.keyPath,"public.txt")
-        self.privateKeyPath = os.path.join(self.keyPath,"private.txt")
+        self.keyPath = os.path.join(self.userPath, ChainNodeConstants.DIR_NAME_KEYS.value)
+        self.publicKeyPath = os.path.join(self.keyPath, ChainNodeConstants.FILE_NAME_PUBLIC_KEY.value)
+        self.privateKeyPath = os.path.join(self.keyPath, ChainNodeConstants.FILE_NAME_PRIVATE_KEY.value)
 
-        self.transactionsPath = os.path.join(self.userPath,"transactions.txt")
+        self.transactionsPath = os.path.join(self.userPath, ChainNodeConstants.FILE_NAME_TRANSACTIONS.value)
 
         if not os.path.exists(self.userPath):
             os.mkdir(self.userPath)
@@ -177,8 +226,6 @@ class ChainNode(GUI):
         if not os.path.exists(self.transactionsPath):
             self.getTransactions()
             pass
-
-
 
     def loadKeySet(self):
         with open(self.privateKeyPath, "rb") as key_file:
@@ -280,10 +327,20 @@ class ChainNode(GUI):
         pass
 
     def validateSingleTransaction_by_token(self,token: str):
-        
         self.printConsole(f"Transaction w/ token: {token} is to be validated")
-        transaction = self.transaction_dict[token]
-        
+        transactionToValidate = self.transaction_dict[token]
+        self.printConsole(transactionToValidate.toJson())
+        pass
+
+    def calculateBalance(self, user):
+        with open(self.transactionsPath,"r") as file:
+            balance = 0
+            for line in file:
+                transaction = Transaction().fromJson(line)
+                if transaction.sender == user:
+                    balance -= transaction.value
+                elif transaction.recipient == user:
+                    balance += transaction.value
         pass
 
     def startTransaction(self):

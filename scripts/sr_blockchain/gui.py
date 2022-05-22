@@ -17,7 +17,7 @@ class GUI:
         self.uisDir =os.path.abspath(os.path.join(os.path.realpath(__file__), "../"*3, "uis"))
         self.windows: Dict[str, window.Window] = {}
         self.app = QtWidgets.QApplication([])
-        print(colored("Initializing GUI",'green'))
+        print("Initializing GUI")
         pass
 
     def addWindow(self, name: str, file: str) -> window.Window:

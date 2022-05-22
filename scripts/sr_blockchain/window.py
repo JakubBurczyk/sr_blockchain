@@ -41,7 +41,7 @@ class Window(QMainWindow):
         :return: None
         """
         self.openedState = False
-        print(colored(f"Closing window: {self._name}", 'red'))
+        print(f"Closing window: {self._name}")
         pass
 
     def open(self) -> None:

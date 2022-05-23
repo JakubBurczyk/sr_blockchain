@@ -208,11 +208,11 @@ class ChainNode(GUI):
         self.selfPath = os.path.join(self.userPath,"user_" + self.id)
         self.selfPath = os.path.abspath(self.selfPath)
 
-        self.keyPath = os.path.join(self.userPath, ChainNodeConstants.DIR_NAME_KEYS.value)
+        self.keyPath = os.path.join(self.selfPath, ChainNodeConstants.DIR_NAME_KEYS.value)
         self.publicKeyPath = os.path.join(self.keyPath, ChainNodeConstants.FILE_NAME_PUBLIC_KEY.value)
         self.privateKeyPath = os.path.join(self.keyPath, ChainNodeConstants.FILE_NAME_PRIVATE_KEY.value)
 
-        self.transactionsPath = os.path.join(self.userPath, ChainNodeConstants.FILE_NAME_TRANSACTIONS.value)
+        self.transactionsPath = os.path.join(self.selfPath, ChainNodeConstants.FILE_NAME_TRANSACTIONS.value)
 
         if not os.path.exists(self.userPath):
             os.mkdir(self.userPath)

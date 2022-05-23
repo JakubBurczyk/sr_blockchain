@@ -375,19 +375,26 @@ class ChainNode(GUI):
             self.getActiveNodes(nodes).append(self.id)
             nodes = [n for n in nodes if n!=transaction.sender]
 
-            votes = {"valid":0, "invalid":0}
+            votes = {TransactionConstants.RETURN_VALIDATION_VALID.value:0, 
+                    TransactionConstants.RETURN_VALIDATION_INVALID.value:0}
             self.printConsole(f"Active nodes {nodes}")
             self.printConsole("Starting voting procedure")
             try:
                 for node in nodes:
                     
-                        self.printConsole("Waiting for validation service ")
-                        rospy.wait_for_service('validateSingleJSON_' + node,1)
-                        self.printConsole("Validate proxy")
-                        validateFromNode = rospy.ServiceProxy('validateSingleJSON_' + node, validateSingleJSON)
-                        self.printConsole(f"Asking node: {node}")
-                        response = validateFromNode(transaction.toJson())
-                        self.printConsole(response)
+                    self.printConsole("Waiting for validation service ")
+                    rospy.wait_for_service('validateSingleJSON_' + node,1)
+                    self.printConsole("Validate proxy")
+                    validateFromNode = rospy.ServiceProxy('validateSingleJSON_' + node, validateSingleJSON)
+                    self.printConsole(f"Asking node: {node}")
+                    response = validateFromNode(transaction.toJson())
+                    
+                    votes[response.result] +=1
+
+                if votes[TransactionConstants.RETURN_VALIDATION_VALID.value] / len(nodes) > 0.5:
+                    self.printConsole("VALIDATION SUCCESFUL ACHEIVED OVER 50% CORRECTNESS")
+                    self.printConsole(votes)
+
             except Exception as e:
                 self.printConsole(f"Generic validate exception {e}")
                 pass

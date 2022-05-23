@@ -61,6 +61,7 @@ catkin_python_setup()
    getTransactionHistory.srv
    initializeTransaction.srv
    signTransaction.srv
+   validateSingleJSON.srv
  )
 
 ## Generate actions in the 'action' folder

@@ -8,4 +8,6 @@ class TransactionConstants(Enum):
     JSON_FIELD_VALUE = "value"
     JSON_FIELD_TIME_REQUEST = "time_request"
     JSON_FIELD_TIME_VALIDATED = "time_validated"
+    RETURN_VALIDATION_VALID = "valid"
+    RETURN_VALIDATION_INVALID =  "invalid"
     pass

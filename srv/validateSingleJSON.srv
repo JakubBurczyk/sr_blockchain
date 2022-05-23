@@ -1,0 +1,4 @@
+string transaction_json
+---
+string node_id
+string result

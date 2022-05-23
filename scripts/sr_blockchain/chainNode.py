@@ -25,8 +25,9 @@ from sr_blockchain.transactionConstants import TransactionConstants
 from sr_blockchain.chainNodeConstants import ChainNodeConstants
 
 from sr_blockchain.gui import GUI
-from sr_blockchain.srv import getTransactionHistory, initializeTransaction, signTransaction
-
+from sr_blockchain.srv import getTransactionHistory, initializeTransaction
+from sr_blockchain.srv import signTransaction, signTransactionResponse
+from sr_blockchain.srv import validateSingleJSON, validateSingleJSONResponse
 
 class Transaction():
     sender: str
@@ -110,7 +111,7 @@ class ChainNode(GUI):
         self.mainWIndow.addButton("pushButton",self.getTransactions)
         self.button_register = self.mainWIndow.addButton("pushButton_register",self.register)
         self.mainWIndow.addButton("pushButton_initTransaction", self.startTransaction)
-        self.mainWIndow.addButton("pushButton_calcMyBalance",lambda: self.calculateBalance(f"user_{self.id}"))
+        self.mainWIndow.addButton("pushButton_calcMyBalance",lambda: self.calculateBalance(f"{self.id}"))
 
         self.spinBox_id = self.mainWIndow.addSpinBox("spinBox_ROS")
         self.spinBox_id_transactions = self.mainWIndow.addSpinBox("spinBox")
@@ -137,6 +138,8 @@ class ChainNode(GUI):
             self.transactionHistoryServer = rospy.Service('getTransactionHistory_' + self.id, getTransactionHistory, self.returnTransactions)
             self.transactionInitServer = rospy.Service('initializeTransaction_' + self.id, initializeTransaction, self.processTransaction)
             self.transactionSignServer = rospy.Service('signTransaction_' + self.id, signTransaction, self.processSignature)
+            self.transactionValidationJSONServer = rospy.Service('validateSingleJSON_' + self.id, validateSingleJSON, self.validateSingleTransactionJSON)
+            
             self.button_register.disable()
             self.spinBox_id.disable()
         except (ServiceException,ROSException) as e:
@@ -307,37 +310,109 @@ class ChainNode(GUI):
         return token
         pass
 
-    def processSignature(self,signTransaction): 
-        token = signTransaction.token
-        signedToken = bytes(bytearray(signTransaction.signedToken))
-        public_key = bytes(bytearray(signTransaction.public_key))
-        
-        senderNode_public_key = serialization.load_pem_public_key(public_key)
-
+    def processSignature(self,sgnTransaction): 
+        token:str = sgnTransaction.token
+        user_id:str = sgnTransaction.user
+        response = signTransactionResponse()
+        response.user = self.id
+        response.response = "signed"
         try:
-            senderNode_public_key.verify(
-                                signedToken,
-                                bytes(token,"UTF-8"),
-                                padding.PSS(
-                                    mgf=padding.MGF1(hashes.SHA256()),
-                                    salt_length=padding.PSS.MAX_LENGTH
-                                    ),
-                                hashes.SHA256()
-                                )
+            if self.transaction_dict[token].sender != user_id:
+                self.printConsole("Sender user mismatch")
+                #raise Exception("Transaction signed user and requested sender mismatch")
+            else:
+                signedToken = bytes(bytearray(sgnTransaction.signedToken))
+                public_key = bytes(bytearray(sgnTransaction.public_key))
 
-            self.validateSingleTransaction_by_token(token)
+                senderNode_public_key = serialization.load_pem_public_key(public_key)
+                self.printConsole("Verifying signature")
+                senderNode_public_key.verify(
+                                    signedToken,
+                                    bytes(token,"UTF-8"),
+                                    padding.PSS(
+                                        mgf=padding.MGF1(hashes.SHA256()),
+                                        salt_length=padding.PSS.MAX_LENGTH
+                                        ),
+                                    hashes.SHA256()
+                                    )
+                self.printConsole("Validating transaction")
+                self.validate(self.transaction_dict[token])
 
         except Exception() as e:
             self.printConsole(e)
+            response.response = "fake"
             pass
 
-        return "processSignature response " + self.id
+        return response
         pass
 
-    def validateSingleTransaction_by_token(self,token: str):
-        self.printConsole(f"Transaction w/ token: {token} is to be validated")
-        transactionToValidate = self.transaction_dict[token]
-        self.printConsole(transactionToValidate.toJson())
+    def getActiveNodes(self, chainNode_ids: List[str]):
+        try:
+            self.printConsole("Getting active nodes")
+            ros_nodes: List[str] = rosnode.get_node_names()
+            
+            for node in ros_nodes:
+                if node.find("chainNode") != -1 and node.find("_") != -1:
+                    node_id = node[node.find("_")+1:]
+                    if node_id != self.id:
+                        self.printConsole(f"Adding node: {node_id}")
+                        chainNode_ids.append(node_id)
+                        
+        except (rospy.ServiceException, rospy.ROSException) as e:
+            self.printConsole(f"Failed to get active nodes: {e}")
+            pass
+        
+        self.printConsole(f"Returning active nodes {chainNode_ids}")
+        return chainNode_ids
+        pass
+
+    def validate(self, transaction: Transaction):
+        if transaction.value <= 0:
+            self.printConsole("Transaction value cannot be below 0")
+            return
+        else:
+            nodes = []
+            self.getActiveNodes(nodes).append(self.id)
+            nodes = [n for n in nodes if n!=transaction.sender]
+
+            votes = {"valid":0, "invalid":0}
+            self.printConsole(f"Active nodes {nodes}")
+            self.printConsole("Starting voting procedure")
+            try:
+                for node in nodes:
+                    
+                        self.printConsole("Waiting for validation service ")
+                        rospy.wait_for_service('validateSingleJSON_' + node,1)
+                        self.printConsole("Validate proxy")
+                        validateFromNode = rospy.ServiceProxy('validateSingleJSON_' + node, validateSingleJSON)
+                        self.printConsole(f"Asking node: {node}")
+                        response = validateFromNode(transaction.toJson())
+                        self.printConsole(response)
+            except Exception as e:
+                self.printConsole(f"Generic validate exception {e}")
+                pass
+            #except (rospy.ServiceException, rospy.ROSException) as e:
+                
+            #    self.printConsole(f"Validate transaction service call failed: {e}")
+            #pass
+        pass
+
+    def validateSingleTransactionJSON(self, transactionJSON):
+        transaction = Transaction().fromJson(transactionJSON.transaction_json)
+        self.printConsole(f"Transaction w/ token: {transaction.token} is to be validated")
+        self.printConsole(transactionJSON)
+
+        self.printConsole(f"Transaction sender {transaction.sender}")
+        balance = self.calculateBalance(transaction.sender)
+        
+        status:TransactionConstants = TransactionConstants.RETURN_VALIDATION_INVALID
+        if balance > transaction.value:
+            status = TransactionConstants.RETURN_VALIDATION_VALID
+
+        response = validateSingleJSONResponse()
+        response.node_id = self.id
+        response.result = status.value
+        return response
         pass
 
     def calculateBalance(self, user):
@@ -345,28 +420,24 @@ class ChainNode(GUI):
             balance = 0
             for line in file:
                 transaction = Transaction().fromJson(line)
+                self.printConsole(f"Sender {transaction.sender} Recipient {transaction.recipient}")
                 if transaction.sender == user:
                     balance -= transaction.value
                 elif transaction.recipient == user:
                     balance += transaction.value
 
-        self.printConsole(f"Balance: {balance}")
+        self.printConsole(f"Balance of user {user} = {balance}")
+        return balance
         pass
 
     def startTransaction(self):
-        ros_nodes: List[str] = rosnode.get_node_names()
-        chainNode_ids = []   
+        nodes = []
+        self.getActiveNodes(nodes)
 
-        for node in ros_nodes:
-            if node.find("chainNode") != -1 and node.find("_") != -1:
-                node_id = node[node.find("_")+1:]
-                if node_id != self.id:
-                    chainNode_ids.append(node_id)
-
-        if not chainNode_ids:
+        if not nodes:
             self.printConsole(f"No nodes to process transaction")
         else:
-            id = random.choice(chainNode_ids)
+            id = random.choice(nodes)
             rospy.wait_for_service('initializeTransaction_' + id,1)
             rospy.wait_for_service('signTransaction_' + id,1)
             try:
@@ -374,7 +445,7 @@ class ChainNode(GUI):
                 response = initTransaction(self.id,id,1.23)
                 token: str = response.token
                 #token = token[token.find("_")+1:]
-                
+                self.printConsole("Signing token")
                 signedToken = self.private_key.sign(
                                 token.encode(),
                                 padding.PSS(
@@ -383,11 +454,11 @@ class ChainNode(GUI):
                                 ),
                                 hashes.SHA256()
                             )
-                
+                self.printConsole("Signed token")
                 sgnTransaction = rospy.ServiceProxy('signTransaction_' + id, signTransaction)
                 serialized_public_key = self.serializePublicKey()
 
-                response = sgnTransaction(token,signedToken, serialized_public_key)
+                response = sgnTransaction(token,self.id,signedToken, serialized_public_key)
                 self.printConsole(response)
 
             except rospy.ServiceException as e:

@@ -203,8 +203,10 @@ class ChainNode(GUI):
         self.startROS()
 
         self.userPath = os.path.join(os.path.realpath(__file__),"..\\"*3)
-        self.userPath = os.path.join(self.userPath,ChainNodeConstants.DIR_NAME_USERS.value,"user_" + self.id)
+        self.userPath = os.path.join(self.userPath,ChainNodeConstants.DIR_NAME_USERS.value)
         self.userPath = os.path.abspath(self.userPath)
+        self.selfPath = os.path.join(self.userPath,"user_" + self.id)
+        self.selfPath = os.path.abspath(self.selfPath)
 
         self.keyPath = os.path.join(self.userPath, ChainNodeConstants.DIR_NAME_KEYS.value)
         self.publicKeyPath = os.path.join(self.keyPath, ChainNodeConstants.FILE_NAME_PUBLIC_KEY.value)
@@ -214,6 +216,10 @@ class ChainNode(GUI):
 
         if not os.path.exists(self.userPath):
             os.mkdir(self.userPath)
+            pass
+
+        if not os.path.exists(self.selfPath):
+            os.mkdir(self.selfPath)
             pass
 
         if not os.path.exists(self.keyPath):

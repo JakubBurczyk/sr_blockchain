@@ -1,5 +1,6 @@
 from __future__ import annotations
 from cgitb import enable
+from re import S
 from typing import Dict, List
 
 import cryptography
@@ -99,6 +100,7 @@ class ChainNode(GUI):
     def __init__(self):
         super().__init__()
         self.mainWIndow = self.addWindow("mainWindow","chainNodeUI.ui")
+        self.id = 0
         pass
 
     def __del__(self):

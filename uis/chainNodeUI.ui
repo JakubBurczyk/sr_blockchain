@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>527</width>
+    <width>467</width>
     <height>538</height>
    </rect>
   </property>
@@ -128,13 +128,36 @@
      <string>ID</string>
     </property>
    </widget>
+   <widget class="QDoubleSpinBox" name="doubleSpinBox_amount">
+    <property name="geometry">
+     <rect>
+      <x>180</x>
+      <y>130</y>
+      <width>62</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="maximum">
+     <double>100.000000000000000</double>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="spinBox_recipient">
+    <property name="geometry">
+     <rect>
+      <x>130</x>
+      <y>130</y>
+      <width>33</width>
+      <height>20</height>
+     </rect>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>527</width>
+     <width>467</width>
      <height>21</height>
     </rect>
    </property>

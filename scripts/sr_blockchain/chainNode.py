@@ -29,6 +29,7 @@ from sr_blockchain.gui import GUI
 from sr_blockchain.srv import getTransactionHistory, initializeTransaction
 from sr_blockchain.srv import signTransaction, signTransactionResponse
 from sr_blockchain.srv import validateSingleJSON, validateSingleJSONResponse
+from sr_blockchain.msg import SaveTransaction
 
 class Transaction():
     sender: str
@@ -117,7 +118,8 @@ class ChainNode(GUI):
 
         self.spinBox_id = self.mainWIndow.addSpinBox("spinBox_ROS")
         self.spinBox_id_transactions = self.mainWIndow.addSpinBox("spinBox")
-
+        self.spinBox_recipient = self.mainWIndow.addSpinBox("spinBox_recipient")
+        self.spinBox_amount = self.mainWIndow.addSpinBox("doubleSpinBox_amount",double=True)
         self.lcd_self_id = self.mainWIndow.addLCD("lcdNumber")
 
         pass
@@ -137,6 +139,8 @@ class ChainNode(GUI):
         self.lcd_self_id.display(self.id)
         try:
             self.rospyNode = rospy.init_node("chainNode_" + self.id)
+            self.transactionSaver = rospy.Subscriber("saveTransaction", SaveTransaction, self.saveTransaction)
+            self.transactionBrodcaster = rospy.Publisher("saveTransaction", SaveTransaction, queue_size=100)
             self.transactionHistoryServer = rospy.Service('getTransactionHistory_' + self.id, getTransactionHistory, self.returnTransactions)
             self.transactionInitServer = rospy.Service('initializeTransaction_' + self.id, initializeTransaction, self.processTransaction)
             self.transactionSignServer = rospy.Service('signTransaction_' + self.id, signTransaction, self.processSignature)
@@ -158,11 +162,17 @@ class ChainNode(GUI):
             #self.running_nodes = rosnode.get_node_names()
         pass
 
+    def saveTransaction(self,msg:SaveTransaction):
+        with open(self.transactionsPath,"a") as file:
+            self.printConsole(f"Saving incoming tranaction {msg}")
+            file.write(msg.transaction + "\n")
+            pass
+        pass
+
     def returnTransactions(self,foo):
         """
         Got no idea where the additional argument is coming from, discard it who cares!
         """
-        
         with open(self.transactionsPath, "r") as file:
             data = file.read()
             return data
@@ -396,6 +406,7 @@ class ChainNode(GUI):
                 if votes[TransactionConstants.RETURN_VALIDATION_VALID.value] / len(nodes) > 0.5:
                     self.printConsole("VALIDATION SUCCESFUL ACHEIVED OVER 50% CORRECTNESS")
                     self.printConsole(votes)
+                    self.transactionBrodcaster.publish(transaction.toJson())
 
             except Exception as e:
                 self.printConsole(f"Generic validate exception {e}")
@@ -442,16 +453,17 @@ class ChainNode(GUI):
     def startTransaction(self):
         nodes = []
         self.getActiveNodes(nodes)
-
+        
         if not nodes:
             self.printConsole(f"No nodes to process transaction")
         else:
-            id = random.choice(nodes)
+            id = str(self.spinBox_recipient.value)
+            amount = self.spinBox_amount.value
             rospy.wait_for_service('initializeTransaction_' + id,1)
             rospy.wait_for_service('signTransaction_' + id,1)
             try:
                 initTransaction = rospy.ServiceProxy('initializeTransaction_' + id, initializeTransaction)
-                response = initTransaction(self.id,id,1.23)
+                response = initTransaction(self.id,id,amount)
                 token: str = response.token
                 #token = token[token.find("_")+1:]
                 self.printConsole("Signing token")

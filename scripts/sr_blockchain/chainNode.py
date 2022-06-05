@@ -117,7 +117,6 @@ class ChainNode(GUI):
         self.mainWIndow.addButton("pushButton_calcMyBalance",lambda: self.calculateBalance(f"{self.id}"))
 
         self.spinBox_id = self.mainWIndow.addSpinBox("spinBox_ROS")
-        self.spinBox_id_transactions = self.mainWIndow.addSpinBox("spinBox")
         self.spinBox_recipient = self.mainWIndow.addSpinBox("spinBox_recipient")
         self.spinBox_amount = self.mainWIndow.addSpinBox("doubleSpinBox_amount",double=True)
         self.lcd_self_id = self.mainWIndow.addLCD("lcdNumber")

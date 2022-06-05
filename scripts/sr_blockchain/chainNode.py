@@ -94,8 +94,6 @@ class Transaction():
         self.token = "REWARD"
         self.hash = "0"
         self.value = self.reward_amount
-        self.time_request = 0
-        self.time_validated = 0
         return self
 
     def toJson(self):

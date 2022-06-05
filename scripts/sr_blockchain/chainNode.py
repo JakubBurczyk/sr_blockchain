@@ -1,6 +1,7 @@
 from __future__ import annotations
 from cgitb import enable
 from re import S
+from time import sleep
 from typing import Dict, List
 
 import cryptography
@@ -21,6 +22,7 @@ import random
 import signal
 import json
 import datetime
+import shutil
 
 from sr_blockchain.transactionConstants import TransactionConstants
 from sr_blockchain.chainNodeConstants import ChainNodeConstants
@@ -120,7 +122,8 @@ class ChainNode(GUI):
     def initWidgets(self):
         self.terminal_out = self.mainWIndow.addTextBrowser("textBrowser")
 
-        self.mainWIndow.addButton("pushButton",self.getTransactions)
+        self.mainWIndow.addButton("pushButton_getTransactions",self.getTransactions)
+        self.button_delete = self.mainWIndow.addButton("pushButton_delete",self.deleteSelf)
         self.button_register = self.mainWIndow.addButton("pushButton_register",self.register)
         self.mainWIndow.addButton("pushButton_initTransaction", self.startTransaction)
         self.mainWIndow.addButton("pushButton_calcMyBalance",self.calculateMyBalance)
@@ -228,7 +231,16 @@ class ChainNode(GUI):
         else:
             self.printConsole("No nodes to ask for transaction history")
             pass
-    
+
+    def deleteSelf(self):
+        balance = self.calculateBalance(self.id)
+        transaction = Transaction(self.id,"DELETE",balance,"DELETE")
+        self.transactionBrodcaster.publish(transaction.toJson())
+        sleep(1)
+        shutil.rmtree(self.selfPath)
+        self.mainWIndow.close()
+        pass
+
     def register(self):
         self.startROS()
 
@@ -266,6 +278,8 @@ class ChainNode(GUI):
             pass
     
         self.lcd_funds.setValue(self.calculateBalance(self.id))
+        self.button_delete.enable()
+        
 
     def loadKeySet(self):
         with open(self.privateKeyPath, "rb") as key_file:
@@ -469,6 +483,8 @@ class ChainNode(GUI):
                     balance -= transaction.value
                 elif transaction.recipient == user:
                     balance += transaction.value
+
+            file.close()
 
         #self.printConsole(f"Balance of user {user} = {balance}")
         return balance

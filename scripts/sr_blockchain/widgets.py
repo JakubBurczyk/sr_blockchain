@@ -133,10 +133,11 @@ class LCD(Widget):
         super(LCD, self).__init__(win, name)
 
         self._value = 0
-        self.frequency = 5 #Hz
+        self.frequency = 1 #Hz
         self.updateDt = 1/self.frequency
         self.lastUpdate = datetime.datetime.now()
         self.getValue = None
+        self.updateable = False
         pass
 
     def setCallback(self, function: Callable):
@@ -146,6 +147,7 @@ class LCD(Widget):
     def setValue(self, value):
         #print(f"LCD: {self.name} displaying: {self.value}")
         self._value = value
+        self.updateable = True
         pass
 
     def display(self, value):
@@ -171,10 +173,11 @@ class LCD(Widget):
         else:
             pass
 
-    @property
-    def updateable(self):
-        return self.getValue is not None
-        pass
+    #@property
+    #def updateable(self):
+    #    print(self.name, self.getValue is not None)
+    #    return self.getValue is not None
+    #    pass
 
     @property
     def value(self):
@@ -198,8 +201,11 @@ class TextBrowser(Widget):
         elif isinstance(line, List):
             for l in line:
                 self._widget.append(l)
-
-        self._widget.verticalScrollBar().setValue(self._widget.verticalScrollBar().maximum())
+        try:
+            #self._widget.verticalScrollBar().setValue(self._widget.verticalScrollBar().maximum())
+            pass
+        except:
+            pass
         pass
 
     def clear(self):

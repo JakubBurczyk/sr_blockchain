@@ -57,7 +57,7 @@ class Transaction():
         self.ready = False
         self.cancelled = False
         self.valid = False
-
+        self.reward_amount = 0.1
         self.dict_repr = {}
         pass
 
@@ -86,6 +86,15 @@ class Transaction():
         return self.dict_repr
         pass
 
+    def reward(self,who):
+        self.sender = "REWARD"
+        self.recipient = who
+        self.token = "REWARD"
+        self.hash = "0"
+        self.value = self.reward_amount
+        self.time_request = 0
+        self.time_validated = 0
+        return self
 
     def toJson(self):
         return json.dumps(self.asDict())
@@ -114,13 +123,15 @@ class ChainNode(GUI):
         self.mainWIndow.addButton("pushButton",self.getTransactions)
         self.button_register = self.mainWIndow.addButton("pushButton_register",self.register)
         self.mainWIndow.addButton("pushButton_initTransaction", self.startTransaction)
-        self.mainWIndow.addButton("pushButton_calcMyBalance",lambda: self.calculateBalance(f"{self.id}"))
+        self.mainWIndow.addButton("pushButton_calcMyBalance",self.calculateMyBalance)
 
         self.spinBox_id = self.mainWIndow.addSpinBox("spinBox_ROS")
         self.spinBox_recipient = self.mainWIndow.addSpinBox("spinBox_recipient")
         self.spinBox_amount = self.mainWIndow.addSpinBox("doubleSpinBox_amount",double=True)
-        self.lcd_self_id = self.mainWIndow.addLCD("lcdNumber")
+        self.lcd_self_id = self.mainWIndow.addLCD("lcdNumber_id")
+        self.lcd_funds = self.mainWIndow.addLCD("lcdNumber_funds")
 
+        self.button_clear = self.mainWIndow.addButton("pushButton_clear",lambda: self.terminal_out.clear())
         pass
 
     def startNode(self):
@@ -148,7 +159,7 @@ class ChainNode(GUI):
             self.button_register.disable()
             self.spinBox_id.disable()
         except (ServiceException,ROSException) as e:
-            self.printConsole(e)
+            #self.printConsole(e)
             self.lcd_self_id.display(-1)
             self.button_register(enable)
             self.spinBox_id(enable)
@@ -163,10 +174,14 @@ class ChainNode(GUI):
 
     def saveTransaction(self,msg:SaveTransaction):
         with open(self.transactionsPath,"a") as file:
-            self.printConsole(f"Saving incoming tranaction {msg}")
-            file.write(msg.transaction + "\n")
+            self.printConsole(f"Saving incoming transaction")
+            try:
+                file.write(msg.transaction + "\n")
+            except Exception as e:
+                print(e)
             pass
         pass
+        self.lcd_funds.setValue(self.calculateBalance(self.id))
 
     def returnTransactions(self,foo):
         """
@@ -192,7 +207,7 @@ class ChainNode(GUI):
 
         if chainNode_ids:
             id = random.choice(chainNode_ids)
-            self.printConsole(["Nodes", chainNode_ids])
+            #self.printConsole(["Nodes", chainNode_ids])
             rospy.wait_for_service('getTransactionHistory_' + id,timeout = 1)
             try:
                 getHistory = rospy.ServiceProxy('getTransactionHistory_'+id, getTransactionHistory)
@@ -202,9 +217,10 @@ class ChainNode(GUI):
                     try:
                         file.write(response.transactionHistory)
                         self.printConsole("Received transaction history")
-                        self.printConsole(response.transactionHistory)
+                        #self.printConsole(response.transactionHistory)
                     except Exception() as e:
-                        self.printConsole(e)
+                        #self.printConsole(e)
+                        pass
 
             except rospy.ServiceException as e:
                 self.printConsole("Get transaction history service call failed: %s"%e)
@@ -248,6 +264,8 @@ class ChainNode(GUI):
         if not os.path.exists(self.transactionsPath):
             self.getTransactions()
             pass
+    
+        self.lcd_funds.setValue(self.calculateBalance(self.id))
 
     def loadKeySet(self):
         with open(self.privateKeyPath, "rb") as key_file:
@@ -305,9 +323,9 @@ class ChainNode(GUI):
         pass
 
     def processTransaction(self,initializeTransaction):
-        self.printConsole([initializeTransaction.sender, initializeTransaction.recipient, initializeTransaction.value])
+        #self.printConsole([initializeTransaction.sender, initializeTransaction.recipient, initializeTransaction.value])
         token = "token_" + self.id + str(random.randint(0,10000000))
-        self.printConsole(token)
+        #self.printConsole(token)
 
         transaction = Transaction(
                         sender = initializeTransaction.sender,
@@ -350,7 +368,7 @@ class ChainNode(GUI):
                 self.validate(self.transaction_dict[token])
 
         except Exception() as e:
-            self.printConsole(e)
+            #self.printConsole(e)
             response.response = "fake"
             pass
 
@@ -359,21 +377,21 @@ class ChainNode(GUI):
 
     def getActiveNodes(self, chainNode_ids: List[str]):
         try:
-            self.printConsole("Getting active nodes")
+            #self.printConsole("Getting active nodes")
             ros_nodes: List[str] = rosnode.get_node_names()
             
             for node in ros_nodes:
                 if node.find("chainNode") != -1 and node.find("_") != -1:
                     node_id = node[node.find("_")+1:]
                     if node_id != self.id:
-                        self.printConsole(f"Adding node: {node_id}")
+                        #self.printConsole(f"Adding node: {node_id}")
                         chainNode_ids.append(node_id)
                         
         except (rospy.ServiceException, rospy.ROSException) as e:
             self.printConsole(f"Failed to get active nodes: {e}")
             pass
         
-        self.printConsole(f"Returning active nodes {chainNode_ids}")
+        #self.printConsole(f"Returning active nodes {chainNode_ids}")
         return chainNode_ids
         pass
 
@@ -388,16 +406,16 @@ class ChainNode(GUI):
 
             votes = {TransactionConstants.RETURN_VALIDATION_VALID.value:0, 
                     TransactionConstants.RETURN_VALIDATION_INVALID.value:0}
-            self.printConsole(f"Active nodes {nodes}")
+            #self.printConsole(f"Active nodes {nodes}")
             self.printConsole("Starting voting procedure")
             try:
                 for node in nodes:
                     
-                    self.printConsole("Waiting for validation service ")
+                    #self.printConsole("Waiting for validation service ")
                     rospy.wait_for_service('validateSingleJSON_' + node,1)
-                    self.printConsole("Validate proxy")
+                    #self.printConsole("Validate proxy")
                     validateFromNode = rospy.ServiceProxy('validateSingleJSON_' + node, validateSingleJSON)
-                    self.printConsole(f"Asking node: {node}")
+                    #self.printConsole(f"Asking node: {node}")
                     response = validateFromNode(transaction.toJson())
                     
                     votes[response.result] +=1
@@ -406,9 +424,13 @@ class ChainNode(GUI):
                     self.printConsole("VALIDATION SUCCESFUL ACHEIVED OVER 50% CORRECTNESS")
                     self.printConsole(votes)
                     self.transactionBrodcaster.publish(transaction.toJson())
+                    reward = Transaction().reward(self.id)
+                    self.transactionBrodcaster.publish(reward.toJson())
+                else:
+                    self.printConsole("VALIDATION FAILED")
 
             except Exception as e:
-                self.printConsole(f"Generic validate exception {e}")
+                #self.printConsole(f"Generic validate exception {e}")
                 pass
             #except (rospy.ServiceException, rospy.ROSException) as e:
                 
@@ -419,14 +441,17 @@ class ChainNode(GUI):
     def validateSingleTransactionJSON(self, transactionJSON):
         transaction = Transaction().fromJson(transactionJSON.transaction_json)
         self.printConsole(f"Transaction w/ token: {transaction.token} is to be validated")
-        self.printConsole(transactionJSON)
+        #self.printConsole(transactionJSON)
 
-        self.printConsole(f"Transaction sender {transaction.sender}")
+        #self.printConsole(f"Transaction sender {transaction.sender}")
         balance = self.calculateBalance(transaction.sender)
         
         status:TransactionConstants = TransactionConstants.RETURN_VALIDATION_INVALID
-        if balance > transaction.value:
+        if balance >= transaction.value:
             status = TransactionConstants.RETURN_VALIDATION_VALID
+            self.printConsole("Processed transaction | Valid")
+        else:
+            self.printConsole("Processed transaction | Insufficient balance")
 
         response = validateSingleJSONResponse()
         response.node_id = self.id
@@ -439,15 +464,20 @@ class ChainNode(GUI):
             balance = 0
             for line in file:
                 transaction = Transaction().fromJson(line)
-                self.printConsole(f"Sender {transaction.sender} Recipient {transaction.recipient}")
+                #self.printConsole(f"Sender {transaction.sender} Recipient {transaction.recipient}")
                 if transaction.sender == user:
                     balance -= transaction.value
                 elif transaction.recipient == user:
                     balance += transaction.value
 
-        self.printConsole(f"Balance of user {user} = {balance}")
+        #self.printConsole(f"Balance of user {user} = {balance}")
         return balance
         pass
+
+    def calculateMyBalance(self):
+        balance = self.calculateBalance(self.id)
+        self.lcd_funds.setValue(balance)
+        print(self.lcd_funds.value)
 
     def startTransaction(self):
         nodes = []
@@ -457,33 +487,36 @@ class ChainNode(GUI):
             self.printConsole(f"No nodes to process transaction")
         else:
             id = str(self.spinBox_recipient.value)
-            amount = self.spinBox_amount.value
-            rospy.wait_for_service('initializeTransaction_' + id,1)
-            rospy.wait_for_service('signTransaction_' + id,1)
-            try:
-                initTransaction = rospy.ServiceProxy('initializeTransaction_' + id, initializeTransaction)
-                response = initTransaction(self.id,id,amount)
-                token: str = response.token
-                #token = token[token.find("_")+1:]
-                self.printConsole("Signing token")
-                signedToken = self.private_key.sign(
-                                token.encode(),
-                                padding.PSS(
-                                    mgf=padding.MGF1(hashes.SHA256()),
-                                    salt_length=padding.PSS.MAX_LENGTH
-                                ),
-                                hashes.SHA256()
-                            )
-                self.printConsole("Signed token")
-                sgnTransaction = rospy.ServiceProxy('signTransaction_' + id, signTransaction)
-                serialized_public_key = self.serializePublicKey()
+            if id == self.id:
+                self.printConsole("Cannot send money to yourself")
+            else:
+                amount = self.spinBox_amount.value
+                rospy.wait_for_service('initializeTransaction_' + id,1)
+                rospy.wait_for_service('signTransaction_' + id,1)
+                try:
+                    initTransaction = rospy.ServiceProxy('initializeTransaction_' + id, initializeTransaction)
+                    response = initTransaction(self.id,id,amount)
+                    token: str = response.token
+                    #token = token[token.find("_")+1:]
+                    self.printConsole("Signing token")
+                    signedToken = self.private_key.sign(
+                                    token.encode(),
+                                    padding.PSS(
+                                        mgf=padding.MGF1(hashes.SHA256()),
+                                        salt_length=padding.PSS.MAX_LENGTH
+                                    ),
+                                    hashes.SHA256()
+                                )
+                    self.printConsole("Signed token")
+                    sgnTransaction = rospy.ServiceProxy('signTransaction_' + id, signTransaction)
+                    serialized_public_key = self.serializePublicKey()
 
-                response = sgnTransaction(token,self.id,signedToken, serialized_public_key)
-                self.printConsole(response)
+                    response = sgnTransaction(token,self.id,signedToken, serialized_public_key)
+                    self.printConsole(response)
 
-            except rospy.ServiceException as e:
-                self.printConsole(f"Init transaction service call failed: {e}")
-            pass
+                except rospy.ServiceException as e:
+                    self.printConsole(f"Init transaction service call failed: {e}")
+                pass
 
     def printConsole(self,text):
         if isinstance(text, str):
